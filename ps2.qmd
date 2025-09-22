@@ -1,0 +1,413 @@
+---
+title: "STATS 506 - Problem set 2"
+author: "Mina Dao"
+format: html
+editor: 
+  markdown: 
+    wrap: 72
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Loading Packages
+
+```{r, warning = FALSE, message = FALSE}
+library(dplyr)
+library(ggplot2)
+library(GGally)
+library(microbenchmark)
+library(tidyr)
+```
+
+## Problem 1: Modified Random Walk
+
+#### a. Implement the random walk in three versions
+
+- Version 1: Using a loop
+```{r}
+#' Function to implement the random walk using loop
+#' move +1 or -1 with 50/50 prob
+#' if +1 is chosen, 5% of the time move +10 instead => +1 is chosen 2.5% of the 
+#' time, +10 is chosen 47.5% of the time
+#' if -1 is chosen, 20% of the time move -3 instead => 40% of the time move -1, 
+#' 10% of the time move -3
+#'
+#' @param n number of steps
+#' @returns `walk` final position of the walk
+random_walk1 <- function(n) {
+  walk <- 0 # start at 0
+  step <- c(1, 10, -1, -3) # possible steps
+  prob <- c(0.475, 0.025, 0.4, 0.1) # weight of the steps
+  
+  for (i in 1:n) {
+    walk <- walk + sample(step, 1, replace = TRUE, prob)
+  }
+  return(walk)
+}
+```
+
+- Version 2: Use a built-in vectorized function in R
+```{r}
+#' Function to implement the random walk using built-in R vectorized functions
+#'
+#' @param n number of steps
+#' @returns `walk` final position of the walk
+random_walk2 <- function(n) {
+  step <- c(1, 10, -1, -3) # possible steps
+  prob <- c(0.475, 0.025, 0.4, 0.1) # weight of the steps
+  seqSteps <- sample(step, n, replace = TRUE, prob)
+  walk <- sum(seqSteps)
+  return(walk)
+}
+```
+
+- Version 3: Implement the random walk using one of the `apply` functions
+```{r}
+#' Function to implement the random walk using one of the `apply` functions
+#'
+#' @param n number of steps
+#' @returns `walk` final position of the walk
+random_walk3 <- function(n) {
+  step <- c(1, 10, -1, -3) # possible steps
+  prob <- c(0.475, 0.025, 0.4, 0.1) # weight of the steps
+  seqSteps <- sample(step, n, replace = TRUE, prob)
+  stepsMat <- matrix(unlist(seqSteps))
+  walk <- apply(stepsMat, 2, sum)
+  return(walk[1])
+}
+```
+Demonstrate that all versions work
+
+```{r}
+random_walk1(10)
+random_walk2(10)
+random_walk3(10)
+random_walk1(1000)
+random_walk2(1000)
+random_walk3(1000)
+```
+#### b. Demonstrate that the three versions can give the same result
+
+```{r}
+set.seed(2)
+random_walk1(10)
+set.seed(2)
+random_walk2(10)
+set.seed(2)
+random_walk3(10)
+
+set.seed(2)
+random_walk1(1000)
+set.seed(2)
+random_walk2(1000)
+set.seed(2)
+random_walk3(1000)
+```
+After using `set.seed`, the three versions give the same output. For `n = 10`, the final position of the walk is $-6$. For `n = 1000`, the final position of the walk is $40$. 
+
+#### c. Demonstrate the speed of the implementations
+
+```{r}
+bench_rd <- microbenchmark(
+  random_walk1(1000),
+  random_walk2(1000),
+  random_walk3(1000)
+)
+bench_rd
+```
+
+We can see that for a low input, on average, implementation using for loop `random_walk1` takes more than $4500$ microseconds, implementation using built-in function `random_walk2` takes about $25$ microseconds, and implementation using `apply` functions `random_walk3` takes $70$ microseconds. Version 1 is about $60$ times slower than Version 3, and it is also about $190$ times slower than Version 2. Version 2 is faster than Version 3, and much faster than Version 1.
+
+```{r}
+bench_rd <- microbenchmark(
+  random_walk1(100000),
+  random_walk2(100000),
+  random_walk3(100000)
+)
+bench_rd
+```
+
+For a large input, on average, implementation using for loop `random_walk1` takes roughly $450$ milliseconds, implementation using built-in function `random_walk2` takes $1.5$ milliseconds, and implementation using `apply` functions `random_walk3` takes $2.5$ microseconds. Version 1 is about $190$ times slower than Version 3, and it is also about $300$ times slower than Version 2. Version 2 is faster than Version 3, and much faster than Version 1. 
+
+For a larger input, the difference in speed among the three implementations becomes much larger.
+
+#### d. Probability the random walk ends at 0
+
+```{r}
+#' Function to run a Monte Carlo stimulation
+#'
+#' @param n number of steps
+#' @param num_sim number of simulations
+#' @returns `prob_end_zero` probability that the final position in the walk is 0
+monte_carlo <- function(n, num_sim = 10000){
+  # create an array of 0's
+  ends <- numeric(num_sim)
+  for (i in 1:num_sim) {
+    ends[i] <- random_walk1(n)
+  }
+  
+  prob_end_zero <- mean(ends == 0)
+  return(prob_end_zero)
+}
+
+set.seed(4)
+monte_carlo(10)
+monte_carlo(100)
+monte_carlo(1000)
+```
+After setting seed, the probability that the random walk ends at $0$ if 
+- the number of steps is $10$ is $0.133$
+- the number of steps is $100$ is $0.021$
+- the number of steps is $1000$ is $0.0057$
+
+## Problem 2: Mean of Mixture of Distributions
+
+```{r}
+sim_cars <- function(num_days) {
+  # create a matrix for all hours across all days
+  # each row represents a day, each column represents an hour, starting from 
+  # 0am (1st hour)
+  cars_mat <- matrix(0, nrow = num_days, ncol = 24)
+  
+  # midnight to 7am (1st to 8th hour): Pois(1)
+  cars_mat[, 1:8] <- matrix(rpois(8 * num_days, lambda = 1), 
+                            nrow = num_days)
+  
+  # 8am (9th hour): N(60, sqrt(12)
+  cars_mat[, 9] <- matrix(rnorm(num_days, mean = 60, sqrt(12)), 
+                          nrow = num_days)
+  
+  # 9am to 4pm (10th to 17th hour): Pois(8)
+  cars_mat[, 10:17] <- matrix(rpois(8 * num_days, lambda = 8), 
+                              nrow = num_days)
+  
+  # 5pm (18th hour): N(60, sqrt(12)
+  cars_mat[, 18] <- matrix(rnorm(num_days, mean = 60, sqrt(12)), 
+                           nrow = num_days)
+  
+  # 6pm to 11pm (19th to 24th hour): Pois(12)
+  cars_mat[, 19:24] <- matrix(rpois(6 * num_days, lambda = 12), 
+                              nrow = num_days)
+  
+  # total of cars each day
+  daily_total <- rowSums(cars_mat)
+  mean_cars <- mean(daily_total)
+  
+  return(mean_cars)
+}
+
+set.seed(10)
+sim_cars(10000)
+```
+By Monte Carlo simulation, the average number of cars that pass the intersection is about $263$ cars.
+
+## Problem 3: Linear Regression
+
+Download data
+```{r}
+youtube <- read.csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-03-02/youtube.csv')
+head(youtube)
+```
+
+#### a. De-identify
+
+Remove any column that might uniquely identify a commercial.
+
+```{r}
+col_identify <- c("brand", "superbowl_ads_dot_com_url", "youtube_url", 
+                  "id", "etag", "published_at", "title", "description", 
+                  "thumbnail", "channel_title")
+youtube <- youtube[, !names(youtube) %in% col_identify]
+dim(youtube)
+```
+The dimensions of the data after removing these columns are $247 \times 15$, 247 observations and 15 variables
+
+#### b. Examine the distribution of each variable
+
+- View counts
+
+```{r, warning = FALSE}
+view_dist <- ggplot(youtube, aes(x = view_count), na.rm = TRUE) +
+  geom_histogram()
+      
+view_dist
+```
+The variable can use a transformation prior to being used as the outcome in a linear regression model as it is right-skewed. We need log transformation.
+
+```{r, warning = FALSE}
+youtube <- youtube %>% mutate(
+  data = youtube,
+  view_count_log = log(view_count)
+)
+
+view_log_dist <- ggplot(youtube, aes(x = view_count_log), na.rm = TRUE) +
+  geom_histogram()
+      
+view_log_dist
+```
+
+
+- Like counts
+
+```{r, warning = FALSE}
+like_dist <- ggplot(youtube, aes(x = like_count), na.rm = TRUE) +
+  geom_histogram()
+      
+like_dist
+```
+The variable can use a transformation prior to being used as the outcome in a linear regression model as it is right-skewed. We need log transformation.
+
+```{r, warning = FALSE}
+youtube <- youtube %>% mutate(
+  data = youtube,
+  like_count_log = log(like_count)
+)
+
+like_log_dist <- ggplot(youtube, aes(x = like_count_log), na.rm = TRUE) +
+  geom_histogram()
+      
+like_log_dist
+```
+
+
+- Dislike counts
+
+```{r, warning = FALSE}
+dislike_dist <- ggplot(youtube, aes(x = dislike_count), na.rm = TRUE) +
+  geom_histogram()
+      
+dislike_dist
+```
+The variable can use a transformation prior to being used as the outcome in a linear regression model as it is right-skewed. We need log transformation.
+
+```{r, warning = FALSE}
+youtube <- youtube %>% mutate(
+  data = youtube,
+  dislike_count_log = log(dislike_count)
+)
+
+dislike_log_dist <- ggplot(youtube, aes(x = dislike_count_log), na.rm = TRUE) +
+  geom_histogram()
+      
+dislike_log_dist
+```
+
+- Favorite counts
+```{r, warning = FALSE}
+fav_dist <- ggplot(youtube, aes(x = favorite_count), na.rm = TRUE) +
+  geom_histogram()
+      
+fav_dist
+```
+
+This variable would not be appropriate to use as the outcome in a linear regression model because it has too many zeros.
+
+- Comment counts
+
+```{r, warning = FALSE}
+comment_dist <- ggplot(youtube, aes(x = comment_count), na.rm = TRUE) +
+  geom_histogram()
+      
+comment_dist
+```
+
+The variable can use a transformation prior to being used as the outcome in a linear regression model as it is right-skewed. We need log transformation.
+
+```{r, warning = FALSE}
+youtube <- youtube %>% mutate(
+  data = youtube,
+  comment_count_log = log(comment_count)
+)
+
+comment_log_dist <- ggplot(youtube, aes(x = comment_count_log), na.rm = TRUE) +
+  geom_histogram()
+      
+comment_log_dist
+```
+
+
+#### c. Fit a linear regression model
+
+```{r}
+# remove all rows with NA and Inf
+youtube <- youtube %>% drop_na()
+youtube <- youtube %>% filter_if(~is.numeric(.), all_vars(!is.infinite(.)))
+
+
+#' Function to fit a linear regression model for each variable
+#'
+#' @param outcome_var outcome variable
+#' @returns `model` the linear fit of the outcome variable based on seven binary flags for characteristics of the ads
+
+lm_fit <- function(outcome_var) {
+  binary_flag <- c("funny", "show_product_quickly", "patriotic", "celebrity", 
+                 "danger", "animals", "use_sex")
+  formula <- as.formula(paste(outcome_var, "~", 
+                              paste(binary_flag, collapse = " + "), "+ year"))
+  model <- lm(formula, data = youtube)
+  return(model)
+}
+```
+
+- View count
+```{r}
+view_lm <- lm_fit("view_count_log")
+summary(view_lm)
+```
+There is moderate evidence that whether the ads is patriotic significantly affects view count of an ads ($0.01 < $ p_value = $0.0288 < 0.05$).
+
+```{r}
+like_lm <- lm_fit("like_count_log")
+summary(like_lm)
+```
+There is strong evidence that the Superbowl year of the ads significantly affects like count of an ads ($0.001 < $ p_value = $0.00127 < 0.01$).
+
+```{r}
+dislike_lm <- lm_fit("dislike_count_log")
+summary(dislike_lm)
+```
+There is weak evidence that whether the ads is patriotic significantly affects dislike count of an ads ($0.05$ < p_value = $0.0807 < 0.1$). There is very strong evidence that the superbowl year of the ads affects the dislike count of the ads (p_value = $4.24 \times 10^{-5} < 0.001$).
+
+```{r}
+comment_lm <- lm_fit("comment_count_log")
+summary(comment_lm)
+```
+There is moderate evidence that whether the ads is patriotic significantly affects comment count of an ads ($0.01$ < p_value = $0.01606 < 0.05$). There is strong evidence that the superbowl year of the ads affects the dislike count of the ads ($0.001 < $ p_value = $0.00320 < 0.01$).
+
+#### d. Design matrix
+
+```{r}
+youtube_num <- youtube %>% mutate(
+  funny = as.integer(as.logical(youtube$funny)), 
+  show_product_quickly = as.integer(as.logical(youtube$show_product_quickly)),
+  patriotic = as.integer(as.logical(youtube$patriotic)),
+  celebrity = as.integer(as.logical(youtube$celebrity)),
+  danger = as.integer(as.logical(youtube$danger)), 
+  animals = as.integer(as.logical(youtube$animals)), 
+  use_sex = as.integer(as.logical(youtube$use_sex))
+)
+head(youtube_num)
+```
+
+```{r}
+view_mat <- matrix(youtube_num$view_count_log, ncol = 1) 
+binary_mat <- data.matrix(youtube_num[,1:8])
+design_mat <- cbind(matrix(1, nrow = nrow(youtube_num)), binary_mat)
+
+beta_ols <- solve(t(design_mat) %*% design_mat) %*% t(design_mat) %*% view_mat
+beta_ols
+
+coef(summary(view_lm))[,1]
+```
+As we can see, the coefficients are exactly the same as `lm` did in part c.
+
+
+
+
+
+
+
+
+
