@@ -201,7 +201,7 @@ sim_cars <- function(num_days) {
 set.seed(10)
 sim_cars(10000)
 ```
-By Monte Carlo simulation, the average number of cars that pass the intersection is about $263$ cars.
+By Monte Carlo simulation, the average number of cars that pass the intersection a day is about $263$ cars.
 
 ## Problem 3: Linear Regression
 
@@ -356,25 +356,26 @@ lm_fit <- function(outcome_var) {
 view_lm <- lm_fit("view_count_log")
 summary(view_lm)
 ```
-There is moderate evidence that whether the ads is patriotic significantly affects view count of an ads ($0.01 < $ p_value = $0.0288 < 0.05$).
+There is weak evidence that whether the ads is patriotic significantly affects view count of an ads ($0.01 < $ p_value = $0.0288 < 0.05$). The coefficient is $0.97915$, which means that patrioticity has a high chance help increase the view. 
+
 
 ```{r}
 like_lm <- lm_fit("like_count_log")
 summary(like_lm)
 ```
-There is strong evidence that the Superbowl year of the ads significantly affects like count of an ads ($0.001 < $ p_value = $0.00127 < 0.01$).
+There is strong evidence that the Superbowl year of the ads significantly affects like count of an ads ($0.001 < $ p_value = $0.00127 < 0.01$). This sounds reasonable as more recent ads video tend to get better like count.
 
 ```{r}
 dislike_lm <- lm_fit("dislike_count_log")
 summary(dislike_lm)
 ```
-There is weak evidence that whether the ads is patriotic significantly affects dislike count of an ads ($0.05$ < p_value = $0.0807 < 0.1$). There is very strong evidence that the superbowl year of the ads affects the dislike count of the ads (p_value = $4.24 \times 10^{-5} < 0.001$).
+There is weak evidence that whether the ads is patriotic significantly affects dislike count of an ads ($0.05$ < p_value = $0.0807 < 0.1$). There is very strong evidence that the superbowl year of the ads affects the dislike count of the ads (p_value = $4.24 \times 10^{-5} < 0.001$). This also is reasonable as more recent ads video tend to have more exposure, leading to more dislikes.
 
 ```{r}
 comment_lm <- lm_fit("comment_count_log")
 summary(comment_lm)
 ```
-There is moderate evidence that whether the ads is patriotic significantly affects comment count of an ads ($0.01$ < p_value = $0.01606 < 0.05$). There is strong evidence that the superbowl year of the ads affects the dislike count of the ads ($0.001 < $ p_value = $0.00320 < 0.01$).
+There is moderate evidence that whether the ads is patriotic significantly affects comment count of an ads ($0.01$ < p_value = $0.01606 < 0.05$). There is strong evidence that the superbowl year of the ads affects the dislike count of the ads ($0.001 < $ p_value = $0.00320 < 0.01$). Patriotic ads (coefficient $1.024$) may bring in more people who actually cares about the content, therefore gaining comments. Recent year (coefficient $8.145 \times 10^{-2}$) also makes sense as people may share about them more.
 
 #### d. Design matrix
 
